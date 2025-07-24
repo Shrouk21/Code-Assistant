@@ -209,20 +209,28 @@ def explain_code(state: StateAgent) -> StateAgent:
 def fallback(state: StateAgent) -> StateAgent:
     """A fallback node for when the router cannot determine the user's intent."""
     user_input = state['message'][-1].content
-    output = f"""I couldn't determine if you wanted to 'generate' or 'explain' from your request: '{user_input}'.
+    prompt = f"""
+You are an expert programmer.
 
-Please clarify:
-- If you want me to write/create code, say something like: "Write a function that..."
-- If you want me to explain code, provide the code and say: "Explain this code:"
+A user gave the following input:
+\"\"\"{user_input}\"\"\"
 
-Examples:
-- "Write a function to reverse a string"
-- "Explain this code: def factorial(n): return 1 if n <= 1 else n * factorial(n-1)"
+Your task is:
+1. Decide if the request is related to code (e.g., asking to generate or explain code).
+2. If the input is AMBIGUOUS or unclear, respond with: 
+   "I don't fully understand your question. Could you please clarify what you want me to do?"
+3. If the input is IRRELEVANT to code, respond with:
+   "Your question seems unrelated to programming, but here's my best answer:" — and then proceed to answer.
+
+Be honest, concise, and helpful.
 """
+    output = llm.invoke(prompt)
+
     return {
         **state,
         'message': state['message'] + [SystemMessage(content=output)]
     }
+
 
 
 graph = StateGraph(StateAgent)
