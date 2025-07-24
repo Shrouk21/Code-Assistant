@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated, Sequence
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, ToolMessage
 from operator import add as add_messages
-from langchain_together import Together
+from langchain_community.llms import Ollama
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -19,13 +19,12 @@ from langchain_core.documents import Document
 
 load_dotenv()
 
-os.environ['TOGETHER_API_KEY'] = '2b9478ae0d7a9ab78f23c0185bd6723f190e3db0662119cc0d7b01bb5733ed30'
-
-llm = Together(
-    model='deepseek-ai/deepseek-coder-6.7b-instruct',
-    temperature=0.2,
-    max_tokens=512
+# Initialize Ollama LLM (Free local model)
+llm = Ollama(
+    model='codellama:7b',  # You can also use 'deepseek-coder:6.7b' or 'llama2:7b'
+    temperature=0.2
 )
+
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-base-v2")
 
 # ------------------Prepare Vector Store (Load if exists, otherwise create) -----------------
@@ -105,12 +104,6 @@ tools = [retriever]
 class StateAgent(TypedDict):
     message:Annotated[Sequence[BaseMessage], add_messages]
     task: str #generate or explain
-
-
-
-# def chat(state: StateAgent) -> StateAgent:
-#     pass
-
 
 
 
@@ -223,7 +216,9 @@ app = graph.compile()
 
 # ------main---------
 def main():
-    print("\n=== CODE ASSISTANT =====")
+    print("\n=== CODE ASSISTANT WITH OLLAMA =====")
+    print("Available models: codellama:7b, deepseek-coder:6.7b, llama2:7b")
+    print("Make sure you have installed the model with: ollama pull codellama:7b")
     
     while True:
         user_input = input("\nWhat is your question: ")
@@ -232,10 +227,16 @@ def main():
             
         messages = [HumanMessage(content=user_input)] # converts back to a HumanMessage type
 
-        result = app.invoke({"message": messages})
-        
-        print("\n=== ANSWER ===")
-        print(result['message'][-1].content)
+        try:
+            result = app.invoke({"message": messages})
+            
+            print("\n=== ANSWER ===")
+            print(result['message'][-1].content)
+        except Exception as e:
+            print(f"\nError: {e}")
+            print("Make sure Ollama is running and the model is installed.")
+            print("Run: ollama serve (in another terminal)")
+            print("Run: ollama pull codellama:7b")
 
 if __name__ == "__main__":
     main()
