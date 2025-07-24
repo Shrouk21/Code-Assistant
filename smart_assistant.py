@@ -28,46 +28,52 @@ llm = Together(
 )
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-base-v2")
 
-# ------------------Prepare dataset -----------------
+# ------------------Prepare Vector Store (Load if exists, otherwise create) -----------------
+persist_directory = 'Smart Code Assitant/chroma_code_db'
 
-ds = load_dataset("openai_humaneval")["test"]
-examples = [{"id": row["task_id"], "prompt": row["prompt"], "solution": row["canonical_solution"]} for row in ds]
-documents = [
-    Document(
-        page_content=f"{ex['prompt']}\n\n# Solution:\n{ex['solution']}",
-        metadata={"id": ex["id"]}
+if not os.path.exists(persist_directory):
+    print("Persistent directory not found. Creating and populating vector store...")
+    ds = load_dataset("openai_humaneval")["test"]
+    examples = [{"id": row["task_id"], "prompt": row["prompt"], "solution": row["canonical_solution"]} for row in ds]
+    documents = [
+        Document(
+            page_content=f"{ex['prompt']}\n\n# Solution:\n{ex['solution']}",
+            metadata={"id": ex["id"]}
+        )
+        for ex in examples
+    ]
+
+    def split_code_by_function(doc: Document) -> list[Document]:
+        text = doc.page_content
+        matches = list(re.finditer(r"^def\s+\w+\(.*?\):", text, re.MULTILINE))
+        if not matches:
+            return [doc]
+        
+        docs = []
+        starts = [m.start() for m in matches] + [len(text)]
+        
+        for i in range(len(starts) - 1):
+            chunk = text[starts[i]:starts[i+1]].strip()
+            if chunk:
+                docs.append(Document(page_content=chunk, metadata=doc.metadata))
+        
+        return docs
+
+    split_documents = []
+    for doc in documents:
+        split_documents.extend(split_code_by_function(doc))
+
+    vectorstore = Chroma.from_documents(
+        documents=split_documents,
+        embedding=embeddings,
+        persist_directory=persist_directory  
     )
-    for ex in examples
-]
+    print("Vector store created and persisted.")
+else:
+    print("Loading existing vector store from persistent directory...")
+    vectorstore = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+    print("Vector store loaded.")
 
-
-def split_code_by_function(doc: Document) -> list[Document]:
-    text = doc.page_content
-    matches = list(re.finditer(r"(?<=\n|^)def\s+\w+\(.*?\):", text))
-    
-    if not matches:
-        return [doc]
-    
-    docs = []
-    starts = [m.start() for m in matches] + [len(text)]
-    
-    for i in range(len(starts) - 1):
-        chunk = text[starts[i]:starts[i+1]].strip()
-        if chunk:
-            docs.append(Document(page_content=chunk, metadata=doc.metadata))
-    
-    return docs
-
-split_documents = []
-for doc in documents:
-    split_documents.extend(split_code_by_function(doc))
-
-
-vectorstore = Chroma.from_documents(
-    documents=split_documents,
-    embedding=embeddings,
-    presist_directory='./chroma_code_db'
-)
 retriever_tool = vectorstore.as_retriever(search_type='similarity', search_kwargs={'k': 5})
 
 
@@ -208,7 +214,7 @@ app = graph.compile()
 # The `display` function is for interactive environments like Jupyter notebooks.
 # To see the graph from a script, it's better to save it to a file.
 try:
-    with open("LangGraph/smart_assistant.png", "wb") as f:
+    with open("Smart Code Assitant/smart_assistant.png", "wb") as f:
         f.write(app.get_graph().draw_mermaid_png())
     print("\nGraph visualization saved to conditional_graph.png")
 except Exception as e:
