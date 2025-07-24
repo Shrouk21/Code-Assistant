@@ -29,7 +29,7 @@ llm = Together(
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-base-v2")
 
 # ------------------Prepare Vector Store (Load if exists, otherwise create) -----------------
-persist_directory = './chroma_code_db'
+persist_directory = 'Code-Assitant\chroma_code_db'
 
 if not os.path.exists(persist_directory):
     print("Persistent directory not found. Creating and populating vector store...")
