@@ -134,10 +134,10 @@ def chat(state: StateAgent) -> StateAgent:
     # classification = result  # Store the raw result for display
     # task = result if result in {'generate', 'explain'} else 'fallback'
     result = llm.invoke(prompt)
-    classification = result.strip().lower()
+    classification = re.search(r'"(generate|explain)"', classification.lower())
 
     # Extract the quoted keyword from the sentence
-    match = re.search(r'"(generate|explain)"', classification.lower())
+    match = classification.lower()
     task = match.group(1) if match else 'fallback'
 
     return {
