@@ -125,6 +125,7 @@ def chat(state: StateAgent) -> StateAgent:
 
     User input:
     {user_input}
+    Expected output: just one word (e.g. generate or explain or something else).
     """
 
 
