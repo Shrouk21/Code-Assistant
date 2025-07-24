@@ -111,15 +111,22 @@ class StateAgent(TypedDict):
 def chat(state: StateAgent) -> StateAgent:
     user_input = state['message'][-1].content
     prompt = f"""
-You are a code assistant. Classify the user's request as one of the following tasks:
-- "generate" → if the user wants code to be written, created, or implemented.
-- "explain" → if the user wants code to be explained, analyzed, or understood.
+    You are an expert AI assistant. Decide the user's intent: do they want code to be *generated* or *explained*?
 
-Only respond with: generate or explain.
+    Classify only as:
+    - generate
+    - explain
 
-User input:
-{user_input}
+    Examples:
+    - "write a function to sort a list" → generate
+    - "explain this function: def foo(x): return x+1" → explain
+    - "generate function that add two numbers" → generate
+    - "give me function that..." → generate
+
+    User input:
+    {user_input}
     """
+
 
     result = llm.invoke(prompt).strip().lower()
     classification = result  # Store the raw result for display
