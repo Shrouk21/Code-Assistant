@@ -22,14 +22,14 @@ load_dotenv()
 os.environ['TOGETHER_API_KEY'] = '2b9478ae0d7a9ab78f23c0185bd6723f190e3db0662119cc0d7b01bb5733ed30'
 
 llm = Together(
-    model='deepseek-coder:6.7b',
+    model='deepseek-ai/deepseek-coder-6.7b-instruct',
     temperature=0.2,
     max_tokens=512
 )
 embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-base-v2")
 
 # ------------------Prepare Vector Store (Load if exists, otherwise create) -----------------
-persist_directory = 'Smart Code Assitant/chroma_code_db'
+persist_directory = './chroma_code_db'
 
 if not os.path.exists(persist_directory):
     print("Persistent directory not found. Creating and populating vector store...")
@@ -213,9 +213,29 @@ app = graph.compile()
 # ------ Visualize-----------------
 # The `display` function is for interactive environments like Jupyter notebooks.
 # To see the graph from a script, it's better to save it to a file.
-try:
-    with open("Smart Code Assitant/smart_assistant.png", "wb") as f:
-        f.write(app.get_graph().draw_mermaid_png())
-    print("\nGraph visualization saved to conditional_graph.png")
-except Exception as e:
-    print(f"\nCould not save graph image. You may need to install playwright (`pip install playwright` and `playwright install`). Error: {e}")
+# try:
+#     with open("Smart Code Assitant/smart_assistant.png", "wb") as f:
+#         f.write(app.get_graph().draw_mermaid_png())
+#     print("\nGraph visualization saved to conditional_graph.png")
+# except Exception as e:
+#     print(f"\nCould not save graph image. You may need to install playwright (`pip install playwright` and `playwright install`). Error: {e}")
+
+
+# ------main---------
+def main():
+    print("\n=== CODE ASSISTANT =====")
+    
+    while True:
+        user_input = input("\nWhat is your question: ")
+        if user_input.lower() in ['exit', 'quit']:
+            break
+            
+        messages = [HumanMessage(content=user_input)] # converts back to a HumanMessage type
+
+        result = app.invoke({"message": messages})
+        
+        print("\n=== ANSWER ===")
+        print(result['message'][-1].content)
+
+if __name__ == "__main__":
+    main()
