@@ -104,6 +104,7 @@ tools = [retriever]
 class StateAgent(TypedDict):
     message:Annotated[Sequence[BaseMessage], add_messages]
     task: str #generate or explain
+    classification: str  # Store the raw classification result
 
 
 
@@ -111,8 +112,8 @@ def chat(state: StateAgent) -> StateAgent:
     user_input = state['message'][-1].content
     prompt = f"""
 You are a code assistant. Classify the user's request as one of the following tasks:
-- "generate" → if the user wants code to be written.
-- "explain" → if the user wants code to be explained.
+- "generate" → if the user wants code to be written, created, or implemented.
+- "explain" → if the user wants code to be explained, analyzed, or understood.
 
 Only respond with: generate or explain.
 
@@ -120,11 +121,14 @@ User input:
 {user_input}
     """
 
-    result=llm.invoke(prompt).strip().lower()
+    result = llm.invoke(prompt).strip().lower()
+    classification = result  # Store the raw result for display
     task = result if result in {'generate', 'explain'} else 'fallback'
+    
     return {
         **state,
-        'task': task
+        'task': task,
+        'classification': classification
     }
 
 def router(state: StateAgent) -> str:
@@ -138,8 +142,14 @@ def generate_code(state: StateAgent) -> StateAgent:
             Below are relevant code snippets from previous solutions:
             {context}
 
-            Now generate a complete solution for the following request:
+            Now generate a complete Python function for the following request:
             {user_input}
+
+            Requirements:
+            - Provide ONLY the function code
+            - Include proper function definition with parameters
+            - Add docstring if appropriate
+            - Make it ready to use
             """
 
     #Generate response using the LLM
@@ -153,26 +163,47 @@ def generate_code(state: StateAgent) -> StateAgent:
 
 def explain_code(state: StateAgent) -> StateAgent:
     user_input = state['message'][-1].content
-    prompt = f"""You are an expert programmer and technical writer.
+    
+    # Check if the input contains actual code
+    if not any(keyword in user_input.lower() for keyword in ['def ', 'class ', 'import ', 'for ', 'if ', 'while ', '=', 'print', 'return']):
+        # If it doesn't look like code, ask for clarification
+        output = f"I don't see any code in your input: '{user_input}'. Please provide the Python code you'd like me to explain."
+    else:
+        prompt = f"""You are an expert programmer and technical writer.
 
-    Your task is to explain the following Python code in simple terms so that a junior developer or student can understand it.
+        Your task is to explain the following Python code in simple terms so that a junior developer or student can understand it.
 
-    Explain what each part does and the overall purpose of the code. Be clear and concise.
+        Explain:
+        1. What each part does
+        2. The overall purpose of the code
+        3. How it works step by step
 
-    CODE:
-    {user_input}
-    """
-    output= llm.invoke(prompt)
+        Be clear and concise.
+
+        CODE:
+        {user_input}
+        """
+        output = llm.invoke(prompt)
+    
     return {
         **state,
-        'message': state['message'] + [HumanMessage(content=prompt), SystemMessage(content=output)]
+        'message': state['message'] + [HumanMessage(content=prompt if 'prompt' in locals() else ""), SystemMessage(content=output)]
     
     }
 
 def fallback(state: StateAgent) -> StateAgent:
     """A fallback node for when the router cannot determine the user's intent."""
     user_input = state['message'][-1].content
-    output = f"I'm sorry, I couldn't determine if you wanted to 'generate' or 'explain' from your request: '{user_input}'. Please clarify."
+    output = f"""I couldn't determine if you wanted to 'generate' or 'explain' from your request: '{user_input}'.
+
+Please clarify:
+- If you want me to write/create code, say something like: "Write a function that..."
+- If you want me to explain code, provide the code and say: "Explain this code:"
+
+Examples:
+- "Write a function to reverse a string"
+- "Explain this code: def factorial(n): return 1 if n <= 1 else n * factorial(n-1)"
+"""
     return {
         **state,
         'message': state['message'] + [SystemMessage(content=output)]
@@ -217,8 +248,10 @@ app = graph.compile()
 # ------main---------
 def main():
     print("\n=== CODE ASSISTANT WITH OLLAMA =====")
-    print("Available models: codellama:7b, deepseek-coder:6.7b, llama2:7b")
-    print("Make sure you have installed the model with: ollama pull codellama:7b")
+    print("💡 Examples:")
+    print("  - Generate: 'Write a function to find prime numbers'")
+    print("  - Explain: 'Explain this code: def hello(): print(\"hi\")'")
+    print("  - Type 'exit' or 'quit' to stop")
     
     while True:
         user_input = input("\nWhat is your question: ")
@@ -230,8 +263,13 @@ def main():
         try:
             result = app.invoke({"message": messages})
             
+            # Display classification
+            classification = result.get('classification', 'unknown')
+            print(f"\n🔍 Task Classification: {classification.upper()}")
+            
             print("\n=== ANSWER ===")
             print(result['message'][-1].content)
+            
         except Exception as e:
             print(f"\nError: {e}")
             print("Make sure Ollama is running and the model is installed.")
