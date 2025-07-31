@@ -13,7 +13,7 @@ def get_app():
     graph.add_conditional_edges('chat', router, {
         'generate': 'generate_code',
         'explain': 'explain_code',
-        'fallback': 'fallback'
+        'unclear': 'fallback'
     })
     graph.add_edge('generate_code', END)
     graph.add_edge('explain_code', END)

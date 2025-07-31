@@ -20,8 +20,8 @@ def chat(state: StateAgent) -> StateAgent:
     prompt = classify_prompt(user_input)
     result = llm.invoke(prompt)
     raw = result.strip().lower()
-    match = re.search(r"(generate|explain)", raw)
-    task = match.group(1) if match else 'fallback'
+    match = re.search(r"(generate|explain|unclear)", raw)
+    task = match.group(1) if match else 'unclear'
     return {**state, 'task': task, 'classification': raw}
 
 def router(state: StateAgent) -> str:
