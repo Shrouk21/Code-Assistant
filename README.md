@@ -23,10 +23,10 @@ graph TD
     B --> C{Task Type}
     C -->|Generate Code| D[Code Generation Node]
     C -->|Explain Code| E[Code Explanation Node]  
-    C -->|Unclear| F[Clarification Node]
+    C -->|Unclear| F[Fallback Node]
     D --> G[Vector Search Tool]
-    E --> G
-    F --> H[Final Response]
+    E --> H[Final Response]
+    F --> H
     G --> H
     H --> I[User Interface]
 ```
