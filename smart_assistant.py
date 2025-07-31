@@ -15,13 +15,30 @@ from langchain_core.tools import tool
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
+# Prompts
+from prompts.prompts import {
+    classify_prompt,
+    generate_prompt,
+    explain_prompt,
+    fallback_prompt
 
+}
+# Customized Tools
+from tools.tools import retriever
+
+# DB
+from vectorstore.retriever import get_retriever
+
+from vectorstore.builder import build_vectorstore
+
+
+# Load environment variables
 
 load_dotenv()
 
 # Initialize Ollama LLM (Free local model)
 llm = Ollama(
-    model='codellama:7b',  # You can also use 'deepseek-coder:6.7b' or 'llama2:7b'
+    model='codellama:7b',  # We can also use 'deepseek-coder:6.7b' or 'llama2:7b'
     temperature=0.2
 )
 
@@ -110,23 +127,24 @@ class StateAgent(TypedDict):
 
 def chat(state: StateAgent) -> StateAgent:
     user_input = state['message'][-1].content
-    prompt = f"""
-    You are an expert AI assistant. Decide the user's intent: do they want code to be *generated* or *explained*?
+    # prompt = f"""
+    # You are an expert AI assistant. Decide the user's intent: do they want code to be *generated* or *explained*?
 
-    Classify only as:
-    - generate
-    - explain
+    # Classify only as:
+    # - generate
+    # - explain
 
-    Examples:
-    - "write a function to sort a list" → generate
-    - "explain this function: def foo(x): return x+1" → explain
-    - "generate function that add two numbers" → generate
-    - "give me function that..." → generate
+    # Examples:
+    # - "write a function to sort a list" → generate
+    # - "explain this function: def foo(x): return x+1" → explain
+    # - "generate function that add two numbers" → generate
+    # - "give me function that..." → generate
 
-    User input:
-    {user_input}
-    Expected output: just one word (e.g. generate or explain or something else).
-    """
+    # User input:
+    # {user_input}
+    # Expected output: just one word (e.g. generate or explain or something else).
+    # """
+    prompt = build_classify_prompt(user_input)
 
 
     # result = llm.invoke(prompt).strip().lower()
@@ -134,7 +152,7 @@ def chat(state: StateAgent) -> StateAgent:
     # classification = result  # Store the raw result for display
     # task = result if result in {'generate', 'explain'} else 'fallback'
     result = llm.invoke(prompt)
-    classification = re.search(r'"(generate|explain)"', classification.lower())
+    classification = re.search(r'"(generate|explain)"', result.lower())
 
     # Extract the quoted keyword from the sentence
     match = classification.lower()
@@ -152,20 +170,22 @@ def router(state: StateAgent) -> str:
 def generate_code(state: StateAgent) -> StateAgent:
     user_input = state['message'][-1].content
     context = retriever(user_input)
-    prompt = f"""You are an expert code generator.
+    # prompt = f"""You are an expert code generator.
 
-            Below are relevant code snippets from previous solutions:
-            {context}
+    #         Below are relevant code snippets from previous solutions:
+    #         {context}
 
-            Now generate a complete Python function for the following request:
-            {user_input}
+    #         Now generate a complete Python function for the following request:
+    #         {user_input}
 
-            Requirements:
-            - Provide ONLY the function code
-            - Include proper function definition with parameters
-            - Add docstring if appropriate
-            - Make it ready to use
-            """
+    #         Requirements:
+    #         - Provide ONLY the function code
+    #         - Include proper function definition with parameters
+    #         - Add docstring if appropriate
+    #         - Make it ready to use
+    #         """
+    prompt = build_generate_prompt(user_input, context)
+
 
     #Generate response using the LLM
     output = llm.invoke(prompt)
@@ -184,20 +204,21 @@ def explain_code(state: StateAgent) -> StateAgent:
         # If it doesn't look like code, ask for clarification
         output = f"I don't see any code in your input: '{user_input}'. Please provide the Python code you'd like me to explain."
     else:
-        prompt = f"""You are an expert programmer and technical writer.
+        # prompt = f"""You are an expert programmer and technical writer.
 
-        Your task is to explain the following Python code in simple terms so that a junior developer or student can understand it.
+        # Your task is to explain the following Python code in simple terms so that a junior developer or student can understand it.
 
-        Explain:
-        1. What each part does
-        2. The overall purpose of the code
-        3. How it works step by step
+        # Explain:
+        # 1. What each part does
+        # 2. The overall purpose of the code
+        # 3. How it works step by step
 
-        Be clear and concise.
+        # Be clear and concise.
 
-        CODE:
-        {user_input}
-        """
+        # CODE:
+        # {user_input}
+        # """
+        prompt = build_explain_prompt(user_input)
         output = llm.invoke(prompt)
     
     return {
@@ -209,21 +230,22 @@ def explain_code(state: StateAgent) -> StateAgent:
 def fallback(state: StateAgent) -> StateAgent:
     """A fallback node for when the router cannot determine the user's intent."""
     user_input = state['message'][-1].content
-    prompt = f"""
-You are an expert programmer.
+#     prompt = f"""
+# You are an expert programmer.
 
-A user gave the following input:
-\"\"\"{user_input}\"\"\"
+# A user gave the following input:
+# \"\"\"{user_input}\"\"\"
 
-Your task is:
-1. Decide if the request is related to code (e.g., asking to generate or explain code).
-2. If the input is AMBIGUOUS or unclear, respond with: 
-   "I don't fully understand your question. Could you please clarify what you want me to do?"
-3. If the input is IRRELEVANT to code, respond with:
-   "Your question seems unrelated to programming, but here's my best answer:" — and then proceed to answer.
+# Your task is:
+# 1. Decide if the request is related to code (e.g., asking to generate or explain code).
+# 2. If the input is AMBIGUOUS or unclear, respond with: 
+#    "I don't fully understand your question. Could you please clarify what you want me to do?"
+# 3. If the input is IRRELEVANT to code, respond with:
+#    "Your question seems unrelated to programming, but here's my best answer:" — and then proceed to answer.
 
-Be honest, concise, and helpful.
-"""
+# Be honest, concise, and helpful.
+# """
+    prompt = build_fallback_prompt(user_input)
     output = llm.invoke(prompt)
 
     return {
