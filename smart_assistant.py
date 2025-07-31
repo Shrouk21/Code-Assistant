@@ -184,7 +184,7 @@ def generate_code(state: StateAgent) -> StateAgent:
     #         - Add docstring if appropriate
     #         - Make it ready to use
     #         """
-    prompt = build_generate_prompt(user_input, context)
+    prompt = generate_prompt(user_input, context)
 
 
     #Generate response using the LLM
@@ -218,7 +218,7 @@ def explain_code(state: StateAgent) -> StateAgent:
         # CODE:
         # {user_input}
         # """
-        prompt = build_explain_prompt(user_input)
+        prompt = explain_prompt(user_input)
         output = llm.invoke(prompt)
     
     return {
@@ -245,7 +245,7 @@ def fallback(state: StateAgent) -> StateAgent:
 
 # Be honest, concise, and helpful.
 # """
-    prompt = build_fallback_prompt(user_input)
+    prompt = fallback_prompt(user_input)
     output = llm.invoke(prompt)
 
     return {
