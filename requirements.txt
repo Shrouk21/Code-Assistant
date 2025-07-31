@@ -1,0 +1,15 @@
+gradio>=4.0.0
+langchain-community
+langchain-huggingface
+langchain-chroma
+langgraph
+datasets
+python-dotenv
+sentence-transformers
+chromadb
+langchain-together
+huggingface-hub
+fsspec
+langchain-core
+transformers
+torch
